@@ -1,0 +1,16 @@
+ASSASSINS = [
+    'Cowboy',
+    'Astronaut',
+    'Rockstar',
+    'Doctor',
+    'Archaeologist',
+    'Vampire',
+    'Mummy',
+    'Detective',
+    'Pirate',
+    'Hula',
+    'Gangster',
+    'Zombie',
+    # 'Frankenstein',
+    # 'Princess',
+]
