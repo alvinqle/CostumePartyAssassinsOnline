@@ -24,6 +24,3 @@ class Room:
 
     def is_empty(self) -> bool:
         return self.occupants == []
-
-    def display(self):
-        print(self.occupants)

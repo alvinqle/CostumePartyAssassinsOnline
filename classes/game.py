@@ -1,4 +1,6 @@
+from pprint import pprint
 import random
+import uuid
 
 from classes.board import Board
 from classes.player import Player
@@ -8,28 +10,45 @@ from config.constants import Color
 class Game:
 
     def __init__(self, player_usernames: list):
-        if len(player_usernames) > 8:
-            lives = 1
-        else:
-            lives = 2
+        lives = 1 if len(player_usernames) > 8 else 2  # If there are more than 8 players, each player has 1 assassin
         self.board = Board()
         self.players = {}
+        self.current_turn = {
+            'players': {}
+        }
+        self.state = {
+            'turns': []
+        }
 
         for index, username in enumerate(player_usernames):
-            self.players[f'player{index}'] = Player(username=username)
-            self.players[f'player{index}'].player_id = f'player{index}'
+            player_id = str(uuid.uuid4())
+            self.players[player_id] = Player(username=username)
+            self.players[player_id].player_id = player_id
             for i in range(lives):
                 assassin = self.board.assassin_pool.pop()
-                self.players[f'player{index}'].assassins[assassin] = self.board.assassin_loc[assassin]
-            self.players[f'player{index}'].display()
+                self.players[player_id].assassins[assassin] = self.board.assassin_locations[assassin]
+                self._log_player_state_on_turn(self.players[player_id])
+            # self.players[player_id].display()
 
+        self._log_board_state_on_turn()
         self.turn_order = list(self.players.keys())
         random.shuffle(self.turn_order)
-        self.board.display()
+        # self.board.display()
 
     @staticmethod
     def roll_dice() -> int:
         return random.randint(0, 5)
+
+    def _log_board_state_on_turn(self):
+        board_state = self.board.get_state()
+        self.current_turn['board'] = board_state
+
+    def _log_player_state_on_turn(self, player):
+        player_state = player.get_state()
+        self.current_turn['players'][player.player_id] = player_state
+
+    def _save_turn_state(self, turn):
+        self.state['turns'].append(turn)
 
     def action(self, player: Player, room_color: str):
 
@@ -47,7 +66,7 @@ class Game:
                 count = 1
                 for kill_option in actionable_assassins:  # Building the list of options to print out
                     kill_string += f'{count}. Assassinate the {kill_option} in ' \
-                                   f'{self.board.assassin_loc[kill_option]} room.\n'
+                                   f'{self.board.assassin_locations[kill_option]} room.\n'
                     count += 1
                 return kill_string
 
@@ -82,8 +101,10 @@ class Game:
 
                     if option <= len(actionable_assassins):  # Player chooses to kill an assassin
                         chosen_assassin = actionable_assassins[option - 1]
-                        self.board.rooms[self.board.assassin_loc[chosen_assassin]].occupants.remove(chosen_assassin)
-                        del self.board.assassin_loc[chosen_assassin]
+                        self.board.rooms[self.board.assassin_locations[chosen_assassin]].occupants.remove(
+                            chosen_assassin)
+                        del self.board.assassin_locations[chosen_assassin]
+                        self.board.assassin_pool.remove(chosen_assassin)
                     else:  # A random assassin is drawn from the pool and killed
                         player.draw_count += 1
                         _draw_from_deck(username=player.username, draw_count=player.draw_count)
@@ -103,8 +124,8 @@ class Game:
 
                     chosen_assassin = actionable_assassins[option - 1]
                     # Removing the chosen assassin from the room they are currently in
-                    self.board.rooms[self.board.assassin_loc[chosen_assassin]].occupants.remove(chosen_assassin)
-                    del self.board.assassin_loc[chosen_assassin]  # "Killing" the assassin permanently
+                    self.board.rooms[self.board.assassin_locations[chosen_assassin]].occupants.remove(chosen_assassin)
+                    del self.board.assassin_locations[chosen_assassin]  # "Killing" the assassin permanently
                 else:  # The player can't move any assassins and is out of draws
                     option_count = 1
                     option_map = {}
@@ -121,8 +142,9 @@ class Game:
                             print('Please enter a valid option from the list.\n')
 
                     # Remove the chosen assassin from the room they are currently in
-                    self.board.rooms[self.board.assassin_loc[option_map[option]]].occupants.remove(option_map[option])
-                    del self.board.assassin_loc[option_map[option]]  # "Killing" the assassin permanently
+                    self.board.rooms[self.board.assassin_locations[option_map[option]]].occupants.remove(
+                        option_map[option])
+                    del self.board.assassin_locations[option_map[option]]  # "Killing" the assassin permanently
                     del player.assassins[option_map[option]]  # Removing assassin from player's playable assassins
                     if len(player.assassins) == 0:  # If player is out of assassins, remove them from turn order
                         del self.turn_order[player.player_id]
@@ -157,13 +179,13 @@ class Game:
                 room_chosen = self.board.adjaceny_map[room_color][second_option - 1]
                 self.board.rooms[room_color].occupants.remove(assassin_chosen)
                 self.board.rooms[room_chosen].occupants.append(assassin_chosen)
-                self.board.assassin_loc[assassin_chosen] = room_chosen
+                self.board.assassin_locations[assassin_chosen] = room_chosen
                 return
             else:
                 assassin_chosen = out_assassins[option - in_length - 1]
-                self.board.rooms[self.board.assassin_loc[assassin_chosen]].occupants.remove(assassin_chosen)
+                self.board.rooms[self.board.assassin_locations[assassin_chosen]].occupants.remove(assassin_chosen)
                 self.board.rooms[room_color].occupants.append(assassin_chosen)
-                self.board.assassin_loc[assassin_chosen] = room_color
+                self.board.assassin_locations[assassin_chosen] = room_color
                 return
 
         if room_color == 'BLACK':
@@ -180,12 +202,26 @@ class Game:
         return False
 
     def start_game(self) -> None:
-        turn_count = 1
+        turn_count, self.current_turn['turn'] = 0, 0
+        self._save_turn_state(self.current_turn)
+        pprint(self.state)
+        self.current_turn = {
+            'players': {}
+        }
+
         while len(self.turn_order) > 1:
+            turn_count += 1
             print(f'Turn {turn_count}\n-------')
             for index, player in enumerate(self.turn_order):
                 roll = self.roll_dice()
                 print(f'{self.players[player].username} rolled {Color(roll).name}.')
                 self.action(player=self.players[player], room_color=Color(roll).name)
-            turn_count += 1
+                self._log_player_state_on_turn(player=self.players[player])
+            self._log_board_state_on_turn()
+            self._save_turn_state(turn=self.current_turn)
+            pprint(self.state)
+            self.current_turn = {
+                'players': {}
+            }
+
         print(f'{self.turn_order[0]} wins!')

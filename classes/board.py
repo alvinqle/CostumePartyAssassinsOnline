@@ -1,3 +1,4 @@
+import copy
 import random
 import time
 
@@ -20,7 +21,7 @@ class Board:
 
     def __init__(self):
         self.assassin_pool = ASSASSINS
-        self.assassin_loc = {}
+        self.assassin_locations = {}
         random.shuffle(self.assassin_pool)
         self.rooms = {
             Color.BLUE.name: Room(Color.BLUE, self.assassin_pool[0:4]),
@@ -31,21 +32,27 @@ class Board:
         }
         for assassin in self.assassin_pool:
             if assassin in self.rooms['BLUE'].get_occupants():
-                self.assassin_loc[assassin] = 'BLUE'
+                self.assassin_locations[assassin] = 'BLUE'
             elif assassin in self.rooms['GRAY'].get_occupants():
-                self.assassin_loc[assassin] = 'GRAY'
+                self.assassin_locations[assassin] = 'GRAY'
             elif assassin in self.rooms['GREEN'].get_occupants():
-                self.assassin_loc[assassin] = 'GREEN'
+                self.assassin_locations[assassin] = 'GREEN'
             elif assassin in self.rooms['RED'].get_occupants():
-                self.assassin_loc[assassin] = 'RED'
+                self.assassin_locations[assassin] = 'RED'
             elif assassin in self.rooms['YELLOW'].get_occupants():
-                self.assassin_loc[assassin] = 'YELLOW'
+                self.assassin_locations[assassin] = 'YELLOW'
         random.shuffle(self.assassin_pool)
 
     def assassins_remain(self):
         return self.assassin_pool == []
 
-    def display(self):
-        for color, room in self.rooms.items():
-            print(color)
-            room.display()
+    def display_state(self):
+        board_state = self.get_state()
+        print(board_state)
+
+    def get_state(self):
+        board_state = {
+            'assassin_locations': copy.deepcopy(self.assassin_locations),
+            'assassin_pool': copy.deepcopy(self.assassin_pool)
+        }
+        return board_state
